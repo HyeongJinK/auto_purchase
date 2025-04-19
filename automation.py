@@ -1,16 +1,12 @@
-import time
-
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
-from logger import log
+
+import config
 from csv_utils import get_user_info_from_public_csv
 from input_values import fill_receiver_info
 from login_captcha import login_and_navigate, solve_captcha_with_retries
+from popup_close import close_gsall_popup
 from product_purchase import navigate_to_product, order_product, navigate_to_enuri
-import config
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support import expected_conditions as EC
 
 ############################################
 # 전역 Selenium WebDriver (Optional 사용)
@@ -65,6 +61,7 @@ def run_automation(csv_url):
 
             if candidate:
                 print(f"[User {idx}] Captcha success: {candidate}, {value}")
+                close_gsall_popup(global_driver)
                 # 상품 이동: 에누리 모드일 경우 Enuri 사이트로, 아니면 기본 navigate_to_product 호출
                 if getattr(config, "enuri_flag", False):
                     navigate_to_enuri(global_driver, product_id)

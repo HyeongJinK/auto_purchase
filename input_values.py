@@ -112,7 +112,7 @@ def fill_receiver_info(driver, sender, receiver_name, base_addr, dtl_addr, conta
     except Exception:
         dbl_qty = 0  # 요소를 찾지 못하거나 파싱 실패 시 0으로 간주
 
-    if dbl_qty == 2:
+    if dbl_qty >= 1:
         # 버튼이 클릭 가능해질 때까지 대기 후 클릭
         coupon_btn = WebDriverWait(driver, 10).until(
             EC.element_to_be_clickable((
@@ -150,13 +150,14 @@ def fill_receiver_info(driver, sender, receiver_name, base_addr, dtl_addr, conta
             ]:
                 try:
                     sel_elem = row.find_element(By.CSS_SELECTOR, f"select[name='{select_name}']")
-                    select = Select(sel_elem)
-                    opts = select.options
-                    if len(opts) >= 2:
-                        select.select_by_index(1)
-                        print(f"{coupon_type}: '{opts[1].text}' 선택 완료")
-                    else:
-                        print(f"{coupon_type}: 옵션이 2개 미만입니다. ({len(opts)}개)")
+                    if sel_elem:
+                        select = Select(sel_elem)
+                        opts = select.options
+                        if len(opts) >= 2:
+                            select.select_by_index(1)
+                            print(f"{coupon_type}: '{opts[1].text}' 선택 완료")
+                        else:
+                            print(f"{coupon_type}: 옵션이 2개 미만입니다. ({len(opts)}개)")
                 except Exception as e:
                     print(f"{coupon_type} 처리 중 오류 발생:", e)
 

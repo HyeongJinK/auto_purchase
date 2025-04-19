@@ -33,7 +33,7 @@ def on_exit_button_click():
 
 root = tk.Tk()
 root.title("Auto Purchase")
-root.geometry("500x380")
+root.geometry("500x220")
 
 var_enuri = tk.BooleanVar(master=root)
 var_enuri.set(getattr(config, "enuri_flag", False))
@@ -47,16 +47,16 @@ label = tk.Label(root, text="CSV URL:")
 label.pack(pady=5)
 
 entry_csv_url = tk.Entry(root, width=50)
-entry_csv_url.insert(0, "https://docs.google.com/spreadsheets/d/e/2PACX-1vRSQv8S1GKaUtgYaMOpBeGB7CmV_574soJxMDUOBvWTQpSCXOEZwxT7L5y_kWu5wYoqflpRVoKLK8SK/pub?gid=0&single=true&output=csv")
+entry_csv_url.insert(0, "")
 entry_csv_url.pack(pady=5)
 
 check_enuri = tk.Checkbutton(root, text="에누리", variable=var_enuri, command=on_enuri_toggle)
 check_enuri.pack(pady=5)
 
-log_text = scrolledtext.ScrolledText(root, height=10, width=60)
-log_text.pack(pady=5)
-
-set_log_widget(log_text)
+# log_text = scrolledtext.ScrolledText(root, height=10, width=60)
+# log_text.pack(pady=5)
+#
+# set_log_widget(log_text)
 
 button_run = tk.Button(root, text="실행", command=on_run_button_click)
 button_run.pack(pady=10)
