@@ -75,13 +75,12 @@ def extract_membership_info(driver, wait_sec: int = 5) -> tuple[str, int] | None
             By.CSS_SELECTOR, ".my-membership-info ul.my-grade-up-info li"
         )
         purchase_cnt = None
-        for li in li_list:
-            m = re.search(r"6개월간\s*(\d+)\s*회", li.text)
+        try:
+            second_li = li_list[1]
+            m = re.search(r"6개월간\s*(\d+)\s*회", second_li.text)
             if m:
                 purchase_cnt = int(m.group(1))
-                break
-
-        if purchase_cnt is None:
+        except IndexError:
             purchase_cnt = 0  # 6개월간 구매 내역이 없을 경우 0으로 설정
 
         logger.info(f"회원 등급: {grade}, 구매 회수: {purchase_cnt}")
