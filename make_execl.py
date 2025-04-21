@@ -1,8 +1,14 @@
+import os
 import threading
 import tkinter as tk
-from tkinter import messagebox
 from datetime import datetime
-import os
+from tkinter import messagebox
+
+from index2 import run_all  # 위 리팩토링된 스크립트의 run_all 함수
+from logging_p import setup_logger
+
+logger = setup_logger("make_execl")  # 추가된 로거 설정)
+
 CONFIG_FILE = os.path.join(os.path.dirname(__file__), 'default_url.txt')
 
 def load_default_url():
@@ -11,15 +17,11 @@ def load_default_url():
             return f.read().strip()
     # if missing, write the hard-coded default and return it
     default = (
-        "https://docs.google.com/spreadsheets/d/e/2PACX-1vR_u3fMoCtuUVO7o1pf-"
-        "GOr1pkrL_fJTx06JVY0xLgGEWz_Dah65qs8VJpU0tNMXQ/pub?"
-        "gid=1943453742&single=true&output=csv"
+        "https://docs.google.com/spreadsheets/d/e/2PACX-1vR_u3fMoCtuUVO7o1pf-GOr1pkrL_fJTx06JVY0xLgGEWz_Dah65qs8VJpU0tNMXQ/pub?gid=1943453742&single=true&output=csv"
     )
     with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
         f.write(default)
     return default
-
-from index2 import run_all  # 위 리팩토링된 스크립트의 run_all 함수
 
 class App:
     def __init__(self, root):
@@ -44,6 +46,8 @@ class App:
             messagebox.showwarning("입력 오류", "CSV URL을 입력해주세요.")
             return
 
+        logger.info(f"실행 버튼 클릭 - 입력 URL: {url}")
+
         # 비활성화 & 상태 표시
         self.run_btn.config(state="disabled", text="실행 중...")
         self.entry.config(state="disabled")
@@ -54,6 +58,7 @@ class App:
     def _worker(self, url):
         # 파일명에 타임스탬프 붙여서 저장
         out_name = f"assets_{datetime.now():%Y%m%d_%H%M%S}.xlsx"
+        logger.info(f"작업 시작 - 저장 파일명: {out_name}")
         try:
             run_all(url, out_name)
             # save the latest URL
@@ -62,8 +67,10 @@ class App:
                     f.write(url)
             except Exception:
                 pass
+            logger.info(f"작업 완료 - 파일 저장: {out_name}")
             self._notify(f"완료! → {out_name}")
         except Exception as e:
+            logger.error(f"작업 중 오류 발생: {e}")
             self._notify(f"실행 중 오류 발생:\n{e}")
 
     def _notify(self, msg):
@@ -75,6 +82,7 @@ class App:
         self.root.after(0, _on_gui)
 
     def on_exit(self):
+        logger.info("프로그램 종료")
         self.root.quit()
 
 if __name__ == "__main__":

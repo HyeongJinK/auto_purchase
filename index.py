@@ -8,7 +8,6 @@ from logger import set_log_widget
 
 
 def on_run_button_click():
-    log_text.delete("1.0", tk.END)
     button_run.config(text="실행중...", state="disabled")
     root.update_idletasks()
 

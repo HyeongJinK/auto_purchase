@@ -15,8 +15,12 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 
+from logging_p import setup_logger
 from login_captcha import login_and_navigate, solve_captcha_with_retries
 from popup_close import close_gsall_popup
+from pwChgPopClose import pwChgPopClose
+
+logger = setup_logger("make_execl")  # 추가된 로거 설정)
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -63,7 +67,8 @@ def extract_membership_info(driver, wait_sec: int = 5) -> tuple[str, int] | None
             )
         )
         # <strong>…</strong> 중 마지막 strong 이 등급
-        grade = desc_el.find_elements(By.TAG_NAME, "strong")[-1].text.strip()
+        grade_elements = desc_el.find_elements(By.TAG_NAME, "strong")
+        grade = grade_elements[-1].text.strip() if grade_elements else "등급 정보 없음"
 
         # 2) '6개월간 xx회' 문구가 들어있는 li 찾기 ────────────────
         li_list = driver.find_elements(
@@ -77,13 +82,13 @@ def extract_membership_info(driver, wait_sec: int = 5) -> tuple[str, int] | None
                 break
 
         if purchase_cnt is None:
-            raise ValueError("6개월간 구매 회수 문구를 찾지 못했습니다.")
+            purchase_cnt = 0  # 6개월간 구매 내역이 없을 경우 0으로 설정
 
+        logger.info(f"회원 등급: {grade}, 구매 회수: {purchase_cnt}")
         return grade, purchase_cnt
-
     except Exception as e:
-        print(f"⚠️ 회원 정보 추출 실패: {e}")
-        return None
+        logger.info(f"⚠️ 회원 정보 추출 실패: {e}")
+        return ("등급 정보 없음", 0)
 
 
 def extract_asset_values(driver, wait_sec: int = 5) -> dict[str, str] | None:
@@ -111,10 +116,11 @@ def extract_asset_values(driver, wait_sec: int = 5) -> dict[str, str] | None:
             if label in ("적립금", "이벤트적립금", "GS ALL 포인트"):
                 result[label] = value
 
+        logger.info(f"자산 추출 완료")
         return result if result else None
 
     except Exception as e:
-        print(f"⚠️ 자산 값 추출 실패: {e}")
+        logger.info(f"⚠️ 자산 값 추출 실패: {e}")
         return None
 
 
@@ -153,7 +159,7 @@ def parse_point_history_from_html(driver, current_balance: int, wait_sec: int = 
                         EC.presence_of_element_located((By.CSS_SELECTOR, "tbody"))
                     )
                 except Exception as e:
-                    print(f"페이지 {page} 이동 실패: {e}")
+                    logger.info(f"페이지 {page} 이동 실패: {e}")
                     continue
 
             rows = driver.find_elements(By.CSS_SELECTOR, "tbody tr")
@@ -183,11 +189,11 @@ def parse_point_history_from_html(driver, current_balance: int, wait_sec: int = 
                         accruals.append((action_date, expire_date, amount))
 
                 except Exception as e:
-                    print(f"행 파싱 중 에러: {e}")
+                    logger.info(f"행 파싱 중 에러: {e}")
                     continue
 
     except Exception as e:
-        print(f"포인트 내역 파싱 실패: {e}")
+        logger.info(f"포인트 내역 파싱 실패: {e}")
         return {}
 
     # 최신 적립부터 소진
@@ -230,7 +236,7 @@ URLS = {
 
 
 def login(driver, name: str, user_id: str, user_pw: str):
-    print(f"🔑 로그인 시도: {user_id} pw: {user_pw}")
+    logger.info(f"🔑 로그인 시도: {user_id} pw: {user_pw}")
 
     # ── 새 탭을 열어 각 계정별 작업을 분리 ─────────────────────────
     try:
@@ -242,11 +248,15 @@ def login(driver, name: str, user_id: str, user_pw: str):
         driver.switch_to.window(driver.window_handles[-1])
 
     login_and_navigate(driver, user_id, user_pw)  # None 대신 실제 드라이버 객체를 넣어야 함
-    candidate, value = solve_captcha_with_retries(driver, max_retries=3)
+    candidate, value = solve_captcha_with_retries(driver, max_retries=5)
 
     if candidate:
         close_gsall_popup(driver)
-        print("\n[Captcha success]")
+        try:
+            pwChgPopClose(driver)
+        except Exception as e:
+            logger.info(f"비밀번호 변경 팝업 처리 실패: {e}")
+
 
         try:
             # ── 로그인 후 마이페이지(실멤버십)로 이동 ─────────────────────
@@ -255,7 +265,7 @@ def login(driver, name: str, user_id: str, user_pw: str):
                 EC.url_contains("cust/rlmemshp")
             )
 
-            print(f"📄 회원 페이지로 이동 완료 → {URLS['member']}")
+            logger.info(f"📄 회원 페이지로 이동 완료 → {URLS['member']}")
 
             grade, cnt = extract_membership_info(driver)
 
@@ -264,11 +274,15 @@ def login(driver, name: str, user_id: str, user_pw: str):
             WebDriverWait(driver, 10).until(
                 EC.url_contains("cust/myshop/accm")
             )
-            print(f"📄 자산 페이지 이동 완료 → {URLS['asset']}")
+            logger.info(f"📄 자산 페이지 이동 완료 → {URLS['asset']}")
 
             asset_info = extract_asset_values(driver)
             current_balance = int(asset_info.get("적립금", "0").replace(",", "").replace("원", "").strip())
             hist = parse_point_history_from_html(driver, current_balance)
+
+            # 사용 끝난 탭 닫기
+            driver.close()
+            driver.switch_to.window(driver.window_handles[0])
 
             return {
                 "NAME": name,
@@ -281,7 +295,7 @@ def login(driver, name: str, user_id: str, user_pw: str):
                 "expiries": hist
             }
         except Exception as e:
-            print(f"⛔ {user_id} 처리 실패: {e}")
+            logger.info(f"⛔ {user_id} 처리 실패: {e}")
             return None
 
 
@@ -344,9 +358,11 @@ def save_to_excel(results, output_path):
 
 
 def run_all(csv_url: str, out_excel: str = "gs_assets.xlsx"):
+    logger.info(f"수집 시작 - URL: {csv_url}")
     creds = fetch_credentials(csv_url)
     if not creds:
-        print("CSV에 유효한 계정이 없습니다.")
+        logger.warning("CSV에 유효한 계정이 없습니다.")
+        logger.info("CSV에 유효한 계정이 없습니다.")
         return
 
     driver = create_driver()
@@ -359,12 +375,14 @@ def run_all(csv_url: str, out_excel: str = "gs_assets.xlsx"):
             results.append(info)
 
     if not results:
-        print("📛 수집된 결과가 없습니다.")
+        logger.warning("📛 수집된 결과가 없습니다.")
+        logger.info("📛 수집된 결과가 없습니다.")
         return
 
     save_to_excel(results, out_excel)
 
-    print(f"✅ 결과 저장 완료 → {Path(out_excel).resolve()}")
+    logger.info(f"✅ 결과 저장 완료 → {Path(out_excel).resolve()}")
+    logger.info(f"✅ 결과 저장 완료 → {Path(out_excel).resolve()}")
 
 
 def main():
