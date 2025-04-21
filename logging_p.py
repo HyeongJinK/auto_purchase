@@ -5,7 +5,9 @@ from datetime import datetime
 def setup_logger(base_filename: str) -> logging.Logger:
     today = datetime.now().strftime("%Y%m%d")
     log_filename = f"{base_filename}_{today}.log"
-    log_path = os.path.join(os.path.dirname(__file__), log_filename)
+    log_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)))
+    os.makedirs(log_dir, exist_ok=True)
+    log_path = os.path.join(log_dir, log_filename)
 
     logger = logging.getLogger(base_filename)
     logger.setLevel(logging.INFO)
