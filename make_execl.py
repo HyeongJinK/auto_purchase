@@ -16,9 +16,7 @@ def load_default_url():
         with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
             return f.read().strip()
     # if missing, write the hard-coded default and return it
-    default = (
-        "https://docs.google.com/spreadsheets/d/e/2PACX-1vR_u3fMoCtuUVO7o1pf-GOr1pkrL_fJTx06JVY0xLgGEWz_Dah65qs8VJpU0tNMXQ/pub?gid=1943453742&single=true&output=csv"
-    )
+    default = ("")
     with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
         f.write(default)
     return default

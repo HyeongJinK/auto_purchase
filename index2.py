@@ -281,7 +281,14 @@ def login(driver, name: str, user_id: str, user_pw: str):
 
             # 사용 끝난 탭 닫기
             driver.close()
-            driver.switch_to.window(driver.window_handles[0])
+            try:
+                if len(driver.window_handles) > 0:
+                    driver.switch_to.window(driver.window_handles[0])
+                    logger.info("기존 창으로 성공적으로 전환됨.")
+                else:
+                    logger.info("⚠️ 남아 있는 창이 없어 전환을 생략합니다.")
+            except Exception as e:
+                logger.info(f"⚠️ 창 전환 실패: {e}")
 
             return {
                 "NAME": name,
