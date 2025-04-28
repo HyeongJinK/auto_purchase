@@ -399,23 +399,26 @@ def save_to_excel(results, output_path):
 
 
 def run_all(csv_url: str, out_excel: str = "gs_assets.xlsx"):
-    creds = fetch_credentials(csv_url)
-    if not creds:
-        update_progress("CSV에 유효한 계정이 없습니다.")
-        return
-    driver = create_driver()
-    results = []
+    try:
+        creds = fetch_credentials(csv_url)
+        if not creds:
+            update_progress("CSV에 유효한 계정이 없습니다.")
+            return
+        driver = create_driver()
+        results = []
 
-    for name, uid, pw in creds:
-        info = login(driver, name, uid, pw)
-        if info:
-            results.append(info)
-    if not results:
-        # update_progress("수집된 결과가 없습니다.")
-        return
+        for name, uid, pw in creds:
+            info = login(driver, name, uid, pw)
+            if info:
+                results.append(info)
+        if not results:
+            # update_progress("수집된 결과가 없습니다.")
+            return
 
-    save_to_excel(results, out_excel)
-    update_progress(f"결과 저장 완료 → {Path(out_excel).resolve()}")
+        save_to_excel(results, out_excel)
+        update_progress(f"결과 저장 완료 → {Path(out_excel).resolve()}")
+    except Exception as e:
+        update_progress(f"오류 발생: {e}")
 
 
 def main():
