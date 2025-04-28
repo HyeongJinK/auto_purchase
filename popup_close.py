@@ -3,7 +3,10 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
 
-def close_gsall_popup(driver, wait_sec: int = 3) -> None:
+from progress_utils import update_progress
+
+
+def close_gsall_popup(driver, wait_sec: int = 5) -> None:
     """
     GS ALL 멤버십 동의 팝업이 떠‑있으면 ‘닫기’ 버튼을 눌러 닫는다.
     (div#gsrIntgLayer  ➜  button#btnClose)
@@ -22,7 +25,7 @@ def close_gsall_popup(driver, wait_sec: int = 3) -> None:
 
         # 안전하게 JS 클릭
         driver.execute_script("arguments[0].click();", close_btn)
-        print("🔕 GS ALL 팝업을 닫았습니다.")
+        update_progress("GS ALL 팝업을 닫았습니다.")
     except (TimeoutException, NoSuchElementException):
         # 팝업이 없거나 이미 사라진 경우
-        print("ℹ️ GS ALL 팝업이 표시되지 않았습니다.")
+        update_progress("GS ALL 팝업이 표시되지 않았습니다.")

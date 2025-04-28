@@ -15,13 +15,10 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 
-from logging_p import setup_logger
 from login_captcha import login_and_navigate, solve_captcha_with_retries
 from popup_close import close_gsall_popup
+from progress_utils import update_progress
 from pwChgPopClose import pwChgPopClose
-
-logger = setup_logger("make_execl")  # 추가된 로거 설정)
-
 
 # ──────────────────────────────────────────────────────────────────────────
 # ── CSV Utilities ──
@@ -83,10 +80,10 @@ def extract_membership_info(driver, wait_sec: int = 5) -> tuple[str, int] | None
         except IndexError:
             purchase_cnt = 0  # 6개월간 구매 내역이 없을 경우 0으로 설정
 
-        logger.info(f"회원 등급: {grade}, 구매 회수: {purchase_cnt}")
+        update_progress(f"회원 등급: {grade}, 구매 회수: {purchase_cnt}")
         return grade, purchase_cnt
     except Exception as e:
-        logger.info(f"⚠️ 회원 정보 추출 실패: {e}")
+        update_progress(f"⚠️ 회원 정보 추출 실패: {e}")
         return ("등급 정보 없음", 0)
 
 
@@ -115,11 +112,11 @@ def extract_asset_values(driver, wait_sec: int = 5) -> dict[str, str] | None:
             if label in ("적립금", "이벤트적립금", "GS ALL 포인트"):
                 result[label] = value
 
-        logger.info(f"자산 추출 완료")
+        update_progress(f"자산 추출 완료")
         return result if result else None
 
     except Exception as e:
-        logger.info(f"⚠️ 자산 값 추출 실패: {e}")
+        update_progress(f"⚠️ 자산 값 추출 실패: {e}")
         return None
 
 
@@ -158,7 +155,7 @@ def parse_point_history_from_html(driver, current_balance: int, wait_sec: int = 
                         EC.presence_of_element_located((By.CSS_SELECTOR, "tbody"))
                     )
                 except Exception as e:
-                    logger.info(f"페이지 {page} 이동 실패: {e}")
+                    update_progress(f"페이지 {page} 이동 실패: {e}")
                     continue
 
             rows = driver.find_elements(By.CSS_SELECTOR, "tbody tr")
@@ -188,11 +185,11 @@ def parse_point_history_from_html(driver, current_balance: int, wait_sec: int = 
                         accruals.append((action_date, expire_date, amount))
 
                 except Exception as e:
-                    logger.info(f"행 파싱 중 에러: {e}")
+                    update_progress(f"행 파싱 중 에러: {e}")
                     continue
 
     except Exception as e:
-        logger.info(f"포인트 내역 파싱 실패: {e}")
+        update_progress(f"포인트 내역 파싱 실패: {e}")
         return {}
 
     # 최신 적립부터 소진
@@ -235,7 +232,7 @@ URLS = {
 
 
 def login(driver, name: str, user_id: str, user_pw: str):
-    logger.info(f"🔑 로그인 시도: {user_id} pw: {user_pw}")
+    update_progress(f"로그인 시도: {user_id}")
 
     # ── 새 탭을 열어 각 계정별 작업을 분리 ─────────────────────────
     try:
@@ -246,63 +243,101 @@ def login(driver, name: str, user_id: str, user_pw: str):
         driver.execute_script("window.open('about:blank','_blank');")
         driver.switch_to.window(driver.window_handles[-1])
 
+
     login_and_navigate(driver, user_id, user_pw)  # None 대신 실제 드라이버 객체를 넣어야 함
     candidate, value = solve_captcha_with_retries(driver, max_retries=5)
 
     if candidate:
         close_gsall_popup(driver)
-        try:
-            pwChgPopClose(driver)
-        except Exception as e:
-            logger.info(f"비밀번호 변경 팝업 처리 실패: {e}")
-
+        pwChgPopClose(driver) # 비밀번호 변경 팝업 닫기
 
         try:
-            # ── 로그인 후 마이페이지(실멤버십)로 이동 ─────────────────────
-            driver.get(URLS["member"])
-            WebDriverWait(driver, 10).until(
-                EC.url_contains("cust/rlmemshp")
-            )
 
-            logger.info(f"📄 회원 페이지로 이동 완료 → {URLS['member']}")
+            if move_rlmemshp(driver):
+                grade, cnt = extract_membership_info(driver)
 
-            grade, cnt = extract_membership_info(driver)
-
-            # ── 자산(적립금) 페이지로 이동 ───────────────────────────
-            driver.get(URLS["asset"])
-            WebDriverWait(driver, 10).until(
-                EC.url_contains("cust/myshop/accm")
-            )
-            logger.info(f"📄 자산 페이지 이동 완료 → {URLS['asset']}")
-
-            asset_info = extract_asset_values(driver)
-            current_balance = int(asset_info.get("적립금", "0").replace(",", "").replace("원", "").strip())
-            hist = parse_point_history_from_html(driver, current_balance)
+            if move_accm(driver):
+                asset_info = extract_asset_values(driver)
+                current_balance = int(asset_info.get("적립금", "0").replace(",", "").replace("원", "").strip())
+                hist = parse_point_history_from_html(driver, current_balance)
 
             # 사용 끝난 탭 닫기
             driver.close()
             try:
                 if len(driver.window_handles) > 0:
                     driver.switch_to.window(driver.window_handles[0])
-                    logger.info("기존 창으로 성공적으로 전환됨.")
+                    update_progress("기존 창으로 성공적으로 전환됨.")
                 else:
-                    logger.info("⚠️ 남아 있는 창이 없어 전환을 생략합니다.")
+                    update_progress("남아 있는 창이 없어 전환을 생략합니다.")
             except Exception as e:
-                logger.info(f"⚠️ 창 전환 실패: {e}")
+                update_progress(f"창 전환 실패: {e}")
+
+            all_amount, event_amount, point_amount = zero_check(asset_info)
+
+            update_progress(f"회원 등급: {grade}, 구매 회수: {cnt} 적립금: {point_amount}, 이벤트적립금: {event_amount}, GS ALL 포인트: {all_amount}")
 
             return {
                 "NAME": name,
                 "ID": user_id,
-                "적립금": asset_info.get("적립금", "0원"),
-                "이벤트적립금": asset_info.get("이벤트적립금", "0원"),
-                "GS ALL 포인트": asset_info.get("GS ALL 포인트", "0P"),
+                "적립금": point_amount,
+                "이벤트적립금": event_amount,
+                "GS ALL 포인트": all_amount,
                 "회원등급": grade,
                 "6개월 주문": cnt,
                 "expiries": hist
             }
         except Exception as e:
-            logger.info(f"⛔ {user_id} 처리 실패: {e}")
+            update_progress(f"{user_id} 처리 실패: {e}")
             return None
+
+
+def zero_check(asset_info):
+    # 안전하게 적립금을 정수로 변환, 없으면 0
+    raw_point = asset_info.get("적립금", "0원")
+    clean_point = raw_point.replace(",", "").replace("원", "").replace(",", "")
+    try:
+        point_amount = int(clean_point)
+    except ValueError:
+        point_amount = 0
+    raw_event = asset_info.get("이벤트적립금", "0원")
+    try:
+        event_amount = int(raw_event.replace(",", "").replace("원", "").strip())
+    except ValueError:
+        event_amount = 0
+    raw_all = asset_info.get("GS ALL 포인트", "0P")
+    try:
+        all_amount = int(raw_all.replace(",", "").replace("P", "").strip())
+    except ValueError:
+        all_amount = 0
+    return all_amount, event_amount, point_amount
+
+
+# ── 자산(적립금) 페이지로 이동 ───────────────────────────
+def move_accm(driver):
+    try:
+        driver.get(URLS["asset"])
+        WebDriverWait(driver, 10).until(
+            EC.url_contains("cust/myshop/accm")
+        )
+        update_progress(f"적립금 페이지 이동 완료 → {URLS['asset']}")
+        return True
+    except Exception as e:
+        update_progress(f"적립금 페이지 이동 실패: {e}")
+        return False
+
+
+# ── 로그인 후 마이페이지(실멤버십)로 이동 ─────────────────────
+def move_rlmemshp(driver):
+    try:
+        driver.get(URLS["member"])
+        WebDriverWait(driver, 10).until(
+            EC.url_contains("cust/rlmemshp")
+        )
+        update_progress(f"회원 페이지로 이동 완료 → {URLS['member']}")
+        return True
+    except Exception as e:
+        update_progress(f"회원 페이지 이동 실패: {e}")
+        return False
 
 
 # ────────────────────────────────────────────────────────────────────
@@ -364,31 +399,23 @@ def save_to_excel(results, output_path):
 
 
 def run_all(csv_url: str, out_excel: str = "gs_assets.xlsx"):
-    logger.info(f"수집 시작 - URL: {csv_url}")
     creds = fetch_credentials(csv_url)
     if not creds:
-        logger.warning("CSV에 유효한 계정이 없습니다.")
-        logger.info("CSV에 유효한 계정이 없습니다.")
+        update_progress("CSV에 유효한 계정이 없습니다.")
         return
-
     driver = create_driver()
-
     results = []
 
     for name, uid, pw in creds:
         info = login(driver, name, uid, pw)
         if info:
             results.append(info)
-
     if not results:
-        logger.warning("📛 수집된 결과가 없습니다.")
-        logger.info("📛 수집된 결과가 없습니다.")
+        # update_progress("수집된 결과가 없습니다.")
         return
 
     save_to_excel(results, out_excel)
-
-    logger.info(f"✅ 결과 저장 완료 → {Path(out_excel).resolve()}")
-    logger.info(f"✅ 결과 저장 완료 → {Path(out_excel).resolve()}")
+    update_progress(f"결과 저장 완료 → {Path(out_excel).resolve()}")
 
 
 def main():
