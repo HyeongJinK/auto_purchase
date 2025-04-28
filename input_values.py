@@ -6,7 +6,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait, Select
 
 
-def fill_receiver_info(driver, sender, receiver_name, base_addr, dtl_addr, contact, pickup_location, allpoint, gspoint, card):
+def fill_receiver_info(driver, sender, receiver_name, base_addr, dtl_addr, contact, pickup_location, allpoint, gspoint, savings, card):
     """
     :param driver: Selenium WebDriver.
     :param sender: string, 보내는 사람 이름.
@@ -17,6 +17,7 @@ def fill_receiver_info(driver, sender, receiver_name, base_addr, dtl_addr, conta
     :param pickup_location: string, 수령장소.
     :param allpoint: string, allpoint 정보.
     :param gspoint: string, gspoint 정보.
+    :param savings: string, 적립금
     :param card: string, 카드 정보.
     """
     # 0) 체크박스 'chkRealSender'가 체크되어 있는지 확인하고, 필요하면 강제 클릭
@@ -101,6 +102,9 @@ def fill_receiver_info(driver, sender, receiver_name, base_addr, dtl_addr, conta
 
     apply_allpoint_logic(driver, allpoint)
     apply_gspoint_logic(driver, gspoint)
+    apply_savings_logic(driver, savings)
+
+
     select_card_option(driver, card)
 
 
@@ -320,6 +324,28 @@ def apply_gspoint_logic(driver, gspoint):
                       checkbox_id="gsnpnt_accm_chk",
                       point_value=gspoint,
                       point_label="GS POINT")
+
+
+# 적립금 입력 로직 추가
+def apply_savings_logic(driver, savings):
+    try:
+        juklib_tr = driver.find_element(By.ID, "div_juklib")
+        if not juklib_tr.is_displayed():
+            print("[적립금] 비활성화 상태 (is_displayed=False) - 입력 생략")
+            return
+    except Exception as e:
+        print("[적립금] div_juklib 찾는 중 오류 발생:", e)
+        return
+
+    try:
+        input_elem = WebDriverWait(driver, 3).until(
+            EC.presence_of_element_located((By.ID, "dcAccmDcAmtTxt"))
+        )
+        input_elem.clear()
+        input_elem.send_keys(str(savings))
+        print(f"[적립금] {savings}원을 입력했습니다.")
+    except Exception as e:
+        print("[적립금] 입력창에 값을 입력하는 중 오류 발생:", e)
 
 
 def select_card_option(driver, card_value):
