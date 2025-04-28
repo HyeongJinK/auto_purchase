@@ -261,6 +261,10 @@ def login(driver, name: str, user_id: str, user_pw: str):
                 current_balance = int(asset_info.get("적립금", "0").replace(",", "").replace("원", "").strip())
                 hist = parse_point_history_from_html(driver, current_balance)
 
+            all_amount, event_amount, point_amount = zero_check(asset_info)
+
+            update_progress(f"회원 등급: {grade}, 구매 회수: {cnt} 적립금: {point_amount}, 이벤트적립금: {event_amount}, GS ALL 포인트: {all_amount}")
+
             # 사용 끝난 탭 닫기
             driver.close()
             try:
@@ -271,10 +275,6 @@ def login(driver, name: str, user_id: str, user_pw: str):
                     update_progress("남아 있는 창이 없어 전환을 생략합니다.")
             except Exception as e:
                 update_progress(f"창 전환 실패: {e}")
-
-            all_amount, event_amount, point_amount = zero_check(asset_info)
-
-            update_progress(f"회원 등급: {grade}, 구매 회수: {cnt} 적립금: {point_amount}, 이벤트적립금: {event_amount}, GS ALL 포인트: {all_amount}")
 
             return {
                 "NAME": name,
@@ -289,6 +289,18 @@ def login(driver, name: str, user_id: str, user_pw: str):
         except Exception as e:
             update_progress(f"{user_id} 처리 실패: {e}")
             return None
+    else:
+        update_progress(f"로그인 실패: {user_id}, 해당 데이터는 추출이 되지 않습니다.", 'error')
+        # 사용 끝난 탭 닫기
+        driver.close()
+        try:
+            if len(driver.window_handles) > 0:
+                driver.switch_to.window(driver.window_handles[0])
+                update_progress("기존 창으로 성공적으로 전환됨.")
+            else:
+                update_progress("남아 있는 창이 없어 전환을 생략합니다.")
+        except Exception as e:
+            update_progress(f"창 전환 실패: {e}")
 
 
 def zero_check(asset_info):
